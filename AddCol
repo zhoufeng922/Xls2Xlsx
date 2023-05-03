@@ -7,7 +7,7 @@ import re
 from openpyxl import load_workbook
 
 # 读取 Excel 文件
-df = pd.read_excel("d:\downloads\Ex.001CBG Support list by Office Created-all.xls",skiprows=3,header=0)   # 注意修改文件名和格式，skiprows=3表示跳过前三行
+df = pd.read_excel("d:\data.xls",skiprows=3,header=0)   # 注意修改文件名和格式，skiprows=3表示跳过前三行
 
 # 提取第10000行到第19999行之间的数据
 #df = df.loc[20000:30000]
@@ -110,10 +110,10 @@ df['YYYYMM'] = dates.dt.strftime('%Y%m')
 df['Dayofweek'] = dates.dt.dayofweek
 	
 # 将结果写回Excel文件
-with pd.ExcelWriter("D:\Documents\同步云盘\坚果云\CRM\Ex.001CBG Support list by Office Created-all.xlsx") as writer:    # 注意修改文件名和格式
-    df.to_excel(writer, index=False, sheet_name="Ex.001CBG Support list by Offic")
-#with pd.ExcelWriter("D:\Ex.001CBG Support list by Office Created-all.xlsx") as writer:    # 注意修改文件名和格式
-#    df.to_excel(writer, index=False, sheet_name="Ex.001CBG Support list by Offic")
+with pd.ExcelWriter("D:\data-all.xlsx") as writer:    # 注意修改文件名和格式
+    df.to_excel(writer, index=False, sheet_name="Sheet1")
+#with pd.ExcelWriter("D:\data-all.xlsx") as writer:    # 注意修改文件名和格式
+#    df.to_excel(writer, index=False, sheet_name="Sheet1")
 # 将结果文件转换成 Excel 2003 格式（可选）
 # wb = load_workbook("your_output_file_name.xlsx")
 # wb.save("your_output_file_name.xls")   # 注意修改文件名和格式
