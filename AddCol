@@ -1,0 +1,120 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+import pandas as pd
+from datetime import datetime
+import re
+from openpyxl import load_workbook
+
+# 读取 Excel 文件
+df = pd.read_excel("d:\downloads\Ex.001CBG Support list by Office Created-all.xls",skiprows=3,header=0)   # 注意修改文件名和格式，skiprows=3表示跳过前三行
+
+# 提取第10000行到第19999行之间的数据
+#df = df.loc[20000:30000]
+
+# 将列名中的末尾空格删除
+df.rename(columns=lambda x: x.rstrip(), inplace=True)
+#将AccountChineseName中的空格替换为AccountName
+df['Account Chinese Name'].fillna(df['Account Name'], inplace=True)
+#
+df['Description'] = df['Description'].fillna('').astype(str).apply(lambda x: "'" + x if x.startswith('=') else x)
+df['Solution'] = df['Solution'].fillna('').astype(str).apply(lambda x: "'" + x if x.startswith('=') else x)
+df['First Respond Content'] = df['First Respond Content'].fillna('').astype(str).apply(lambda x: "'" + x if x.startswith('=') else x)
+	
+# 使用 .str.split() 方法将 "Call Date Time" 切分成两个字符串
+date_time_split = df["Call Date Time"].str.split(" ", n=1, expand=True)
+
+# 用 .iloc[] 方法选择想要的列，.str.strip() 方法去除空格
+df["Date"] = date_time_split.iloc[:, 0].str.strip()
+df["Call_Time"] = date_time_split.iloc[:, 1].str.strip()
+
+# 使用 .str.split() 方法将 "Escalate Date" 切分成两个字符串
+Escalate_Date_split = df["Escalate date"].str.split(" ", n=1, expand=True)
+
+# 用 .iloc[] 方法选择想要的列，.str.strip() 方法去除空格
+df["Escalate_Date"] = Escalate_Date_split.iloc[:, 0].str.strip()
+df["Escalate_Time"] = Escalate_Date_split.iloc[:, 1].str.strip()
+
+# 使用 .str.split() 方法将 "Close Date" 切分成两个字符串
+Close_Date_split = df["Close Date"].str.split(" ", n=1, expand=True)
+
+# 用 .iloc[] 方法选择想要的列，.str.strip() 方法去除空格
+df["Close_Date"] = Close_Date_split.iloc[:, 0].str.strip()
+df["Close_Time"] = Close_Date_split.iloc[:, 1].str.strip()
+
+# 使用 .str.split() 方法将 "First Respond Date" 切分成两个字符串
+Respond_Date_split = df["First Respond Date"].str.split(" ", n=1, expand=True)
+
+# 用 .iloc[] 方法选择想要的列，.str.strip() 方法去除空格
+df["First_Respond_Date"] = Respond_Date_split.iloc[:, 0].str.strip()
+df["First_Respond_Time"] = Respond_Date_split.iloc[:, 1].str.strip()
+
+# 假设有一个名为 df 的数据帧，含有 Call Date 和 Escalate Date 两列数据
+df['Sameday_Esca'] = ["Y" if date1 == date2 else "" for date1, date2 in zip(df["Date"], df["Escalate_Date"])]
+df['Sameday_Close'] = ["Y" if date1 == date2 else "" for date1, date2 in zip(df["Date"], df["Close_Date"])]
+df['Sameday_Respond'] = ["Y" if date1 == date2 else "" for date1, date2 in zip(df["Date"], df["First_Respond_Date"])]
+# 转换成 datetime 对象
+df['Call Date Time'] = pd.to_datetime(df['Call Date Time'], format='%Y-%m-%d %H:%M:%S')
+df['First Respond Date'] = pd.to_datetime(df['First Respond Date'], format='%Y-%m-%d %H:%M:%S', errors='coerce')
+df['Escalate date'] = pd.to_datetime(df['Escalate date'], format='%Y-%m-%d %H:%M:%S', errors='coerce')
+df['Age Value'] = pd.to_numeric(df['Age Value'], errors='coerce')
+# 计算时间差
+df['First_Respond_Days'] = ''
+mask = df['First Respond Date'].notnull()
+time_diff = (df['First Respond Date'] - df['Call Date Time']).dt.total_seconds() / (24 * 60 * 60)
+df.loc[mask,['First_Respond_Days']] = round(time_diff,2)
+
+df['Escalate_Days'] = ''
+mask = df['Escalate date'].notnull()
+time_diff2 = (df['Escalate date'] - df['Call Date Time']).dt.total_seconds() / (24 * 60 * 60)
+df.loc[mask, ['Escalate_Days']] = round(time_diff2, 2)
+
+df['GiveSolution_Date'] = ''
+mask = df['Status'] == 'Give Solution'
+if mask.any():
+    times = pd.to_datetime(df['Call Date Time'])
+    age_values = pd.to_numeric(df['Age Value'], errors='coerce')
+    df.loc[mask, ['GiveSolution_Date']] = (times + pd.to_timedelta(age_values, unit='D')).dt.strftime('%Y-%m-%d %H:%M:%S')
+
+# 如果 Status 为 'Give Solution' 且 'Age Value' 不为空，则计算 'GiveSolution_Days'
+df['GiveSolution_Days'] = ''
+mask = (df['Status'] == 'Give Solution') & (df['Age Value'].notnull())
+time_diff3 = df['Age Value'].fillna(0)  # / pd.Timedelta(days=1)
+df.loc[mask, ['GiveSolution_Days']] = round(time_diff3, 2).astype(str)
+
+df['SiteCfm_Date'] = ''
+mask = df['Status'] == 'Site to confirm close'
+if mask.any():
+    times = pd.to_datetime(df['Call Date Time'])
+    age_values = pd.to_numeric(df['Age Value'], errors='coerce')
+    df.loc[mask, ['SiteCfm_Date']] = (times + pd.to_timedelta(age_values, unit='D')).dt.strftime('%Y-%m-%d %H:%M:%S')
+
+# 如果 Status 为 'Site to confirm close' 且 'Age Value' 不为空，则计算 'Sitecfm_Days'
+df['SiteCfm_Days'] = ''
+mask = (df['Status'] == 'Site to confirm close') & (df['Age Value'].notnull())
+time_diff4 = df['Age Value'].fillna(0)  # / pd.Timedelta(days=1)
+df.loc[mask, ['SiteCfm_Days']] = round(time_diff4, 2).astype(str)
+# 将 'Age Value' 转换为浮点数格式
+df['Age Value'] = df['Age Value'].astype(float)
+
+#----------------------------
+#  Call Date Time 列数据
+dates = pd.to_datetime(df['Call Date Time'])
+
+# 提取日期信息为新的列
+df['Year'] = dates.dt.year
+df['Month'] = dates.dt.month
+df['Week'] = dates.dt.isocalendar().week
+df['Day'] = dates.dt.day
+df['YYYYMM'] = dates.dt.strftime('%Y%m')
+df['Dayofweek'] = dates.dt.dayofweek
+	
+# 将结果写回Excel文件
+with pd.ExcelWriter("D:\Documents\同步云盘\坚果云\CRM\Ex.001CBG Support list by Office Created-all.xlsx") as writer:    # 注意修改文件名和格式
+    df.to_excel(writer, index=False, sheet_name="Ex.001CBG Support list by Offic")
+#with pd.ExcelWriter("D:\Ex.001CBG Support list by Office Created-all.xlsx") as writer:    # 注意修改文件名和格式
+#    df.to_excel(writer, index=False, sheet_name="Ex.001CBG Support list by Offic")
+# 将结果文件转换成 Excel 2003 格式（可选）
+# wb = load_workbook("your_output_file_name.xlsx")
+# wb.save("your_output_file_name.xls")   # 注意修改文件名和格式
+
